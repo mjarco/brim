@@ -10,6 +10,7 @@ type bucketCreds struct {
 
 type RadosConf struct {
 	Endpoint, AdminAccessKey, AdminSecretKey, AdminPrefix, BucketEndpoint string
+	Database DBConfig
 }
 
 func listBucketsWithAuth(rc RadosConf) ([]bucketCreds, error) {
@@ -47,6 +48,9 @@ func processUser(api *radosAPI.API, userName, endpoint string) ([]bucketCreds, e
 
 	tasks := []bucketCreds{}
 	for _, bucket := range userBuckets {
+		if bucket.Name == "" {
+			continue
+		}
 		tasks = append(tasks, bucketCreds{
 			bucketName: bucket.Name,
 			accessKey: user.Keys[0].AccessKey,

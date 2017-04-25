@@ -93,15 +93,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Cannot read brim config")
 	}
-	print("list buckets")
 	bucketsCreds, err := listBucketsWithAuth(rc)
-	print("got buckets")
 	if err != nil {
 		log.Fatalf("Problems with fetching buckets list with keys", err.Error())
 	}
-
+	storage := &dbStorage{
+		config: rc.Database,
+	}
 	for _, bc := range bucketsCreds {
-		fmt.Printf("\n%v\n\n", bc)
 		bucketListing := processBucket(bc.endpoint, bc.bucketName,
 			bc.accessKey, bc.secretKey)
 		if bucketListing == nil {
@@ -111,13 +110,12 @@ func main() {
 			cks := make (chan clasifiedKey)
 			go func(){
 				for clasifiedKey := range cks {
-					store(clasifiedKey)
+					storage.store(clasifiedKey)
 				}
 			}()
 			clasifier(ring, listResp, cks)
 			close(cks)
 		}
-
 	}
 
 
