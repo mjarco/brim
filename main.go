@@ -32,7 +32,7 @@ var (
 			ExistingFile()
 )
 
-type clasifiedKey struct {
+type classifiedKey struct {
 	path, clusterName string
 }
 
@@ -57,17 +57,17 @@ func configure () (RadosConf, error) {
 	return rc, err
 }
 
-func clasifier(
+func classifier(
 	ring sharding.ShardsRing,
 	listResp *s3.ListResp,
-	clasified chan<-clasifiedKey) {
+	classified chan<-classifiedKey) {
 	for _, key := range listResp.Contents {
 		path := listResp.Name + "/" + key.Key
 		cl, err := ring.Pick(path)
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-		clasified <- clasifiedKey{path, cl.Name}
+		classified <- classifiedKey{path, cl.Name}
 	}
 }
 
@@ -107,13 +107,13 @@ func main() {
 			continue // ?
 		}
 		for listResp := range bucketListing {
-			cks := make (chan clasifiedKey)
+			cks := make (chan classifiedKey)
 			go func(){
-				for clasifiedKey := range cks {
-					storage.store(clasifiedKey)
+				for classifiedKey := range cks {
+					storage.store(classifiedKey)
 				}
 			}()
-			clasifier(ring, listResp, cks)
+			classifier(ring, listResp, cks)
 			close(cks)
 		}
 	}

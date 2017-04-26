@@ -40,7 +40,7 @@ func (s *dbStorage) conn() (db *sql.DB, err error) {
 	return s.db, err
 }
 
-func (s *dbStorage) renderQuery (classKey clasifiedKey) (string, error) {
+func (s *dbStorage) renderQuery (classKey classifiedKey) (string, error) {
 	var err error
 	task := MigrationTask{
 		Key: classKey.path,
@@ -61,7 +61,7 @@ func (s *dbStorage) renderQuery (classKey clasifiedKey) (string, error) {
 	return queryBuf.String(), nil
 }
 
-func (s *dbStorage) store(task clasifiedKey) error {
+func (s *dbStorage) store(task classifiedKey) error {
 	db, err := s.conn()
 	if err != nil {
 		return err
