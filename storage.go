@@ -42,11 +42,12 @@ func (s *dbStorage) conn() (db *sql.DB, err error) {
 
 func (s *dbStorage) renderQuery (classKey classifiedKey) (string, error) {
 	var err error
+
 	task := MigrationTask{
 		Key: classKey.path,
 		Env: "none",
-		To: classKey.clusterName,
-		From: "jakubra",
+		To: classKey.targetCluster,
+		From: classKey.sourceCluster,
 	}
 
 	if s.tmpl == nil {

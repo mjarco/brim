@@ -8,13 +8,12 @@ type bucketCreds struct {
 	endpoint, bucketName, accessKey, secretKey string
 }
 
-type RadosConf struct {
-	Endpoint, AdminAccessKey, AdminSecretKey, AdminPrefix, BucketEndpoint string
-	Database DBConfig
+type AdminConf struct {
+	Endpoint, AdminAccessKey, AdminSecretKey, AdminPrefix string
 }
 
-func listBucketsWithAuth(rc RadosConf) ([]bucketCreds, error) {
-	api, err := radosAPI.New(rc.Endpoint, rc.AdminAccessKey, rc.AdminSecretKey, rc.AdminPrefix)
+func listBucketsWithAuth(ac AdminConf) ([]bucketCreds, error) {
+	api, err := radosAPI.New(ac.Endpoint, ac.AdminAccessKey, ac.AdminSecretKey, ac.AdminPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +23,7 @@ func listBucketsWithAuth(rc RadosConf) ([]bucketCreds, error) {
 	}
 	tasks := []bucketCreds{}
 	for _, userName := range allUsers {
-		utasks, err := processUser(api, userName, rc.BucketEndpoint)
+		utasks, err := processUser(api, userName, ac.Endpoint)
 		if err != nil {
 			return tasks, err
 		}

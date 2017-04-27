@@ -33,41 +33,65 @@ var (
 )
 
 type classifiedKey struct {
-	path, clusterName string
+	path, sourceCluster, targetCluster string
 }
 
-func configure () (RadosConf, error) {
-	rc := RadosConf{}
+type BrimConf struct {
+	Database DBConfig
+	Admins map[string][]AdminConf
+	urlToCluster map[string]string
+}
+
+func (bc *BrimConf) endpointClusterMap () map[string]string {
+	if bc.urlToCluster == nil {
+		bc.urlToCluster = make(map[string]string)
+		for key, endpoints := range(bc.Admins) {
+			for _, adminConf := range(endpoints) {
+				bc.urlToCluster[adminConf.Endpoint] = key
+			}
+		}
+	}
+	return bc.urlToCluster
+}
+
+func configure () (BrimConf, error) {
+	bc := BrimConf{}
 	confFile, err := os.Open(*brimConf)
 	if err != nil {
 		log.Fatalf("[ ERROR ] Problem with opening config file: '%s' - err: %v !", *brimConf, err)
-		return rc, err
+		return bc, err
 	}
 	defer confFile.Close()
 
 	bs, err := ioutil.ReadAll(confFile)
 	if err != nil {
-		return rc, err
+		return bc, err
 	}
-	err = yaml.Unmarshal(bs, &rc)
+	err = yaml.Unmarshal(bs, &bc)
 	if err != nil {
-		return rc, err
+		return bc, err
 	}
-	fmt.Printf("%v\n", rc)
-	return rc, err
+	fmt.Printf("%v\n", bc)
+	return bc, err
 }
 
 func classifier(
 	ring sharding.ShardsRing,
 	listResp *s3.ListResp,
-	classified chan<-classifiedKey) {
+	classified chan<-classifiedKey,
+	source string,
+	endpointClusterMap map[string]string) {
 	for _, key := range listResp.Contents {
 		path := listResp.Name + "/" + key.Key
 		cl, err := ring.Pick(path)
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-		classified <- classifiedKey{path, cl.Name}
+		classified <- classifiedKey{
+			path,
+			endpointClusterMap[source],
+			cl.Name,
+		}
 	}
 }
 
@@ -81,25 +105,18 @@ func mkRing() (sharding.ShardsRing, error) {
 	return ring, err
 }
 
-func main() {
-	versionString := fmt.Sprintf("Akubra (%s version)", version)
-	kingpin.Version(versionString)
-	kingpin.Parse()
-	ring, err := mkRing()
-	if err != nil {
-		log.Fatalf("Cannot find ring: %s", err.Error())
-	}
-	rc, err := configure()
-	if err != nil {
-		log.Fatalf("Cannot read brim config")
-	}
-	bucketsCreds, err := listBucketsWithAuth(rc)
+func processCluster(
+	ac AdminConf,
+	storage *dbStorage,
+	ring sharding.ShardsRing,
+	endpointClusterMap map[string]string) {
+
+	source := ac.Endpoint
+	bucketsCreds, err := listBucketsWithAuth(ac)
 	if err != nil {
 		log.Fatalf("Problems with fetching buckets list with keys", err.Error())
 	}
-	storage := &dbStorage{
-		config: rc.Database,
-	}
+
 	for _, bc := range bucketsCreds {
 		bucketListing := processBucket(bc.endpoint, bc.bucketName,
 			bc.accessKey, bc.secretKey)
@@ -113,10 +130,27 @@ func main() {
 					storage.store(classifiedKey)
 				}
 			}()
-			classifier(ring, listResp, cks)
+			classifier(ring, listResp, cks, source, endpointClusterMap)
 			close(cks)
 		}
 	}
+}
 
+func main() {
+	versionString := fmt.Sprintf("Akubra (%s version)", version)
+	kingpin.Version(versionString)
+	kingpin.Parse()
+	ring, err := mkRing()
+	if err != nil {
+		log.Fatalf("Cannot find ring: %s", err.Error())
+	}
+	bc, err := configure()
+	if err != nil {
+		log.Fatalf("Cannot read brim config %s", err.Error())
+	}
 
+	storage := &dbStorage{
+		config: bc.Database,
+	}
+	processCluster(bc.Admins["prod"][0], storage, ring, bc.endpointClusterMap())
 }
