@@ -87,10 +87,17 @@ func classifier(
 		if err != nil {
 			fmt.Println(err.Error())
 		}
+		dest := cl.Name
+		target := endpointClusterMap[source]
+
+		if source == target {
+			continue
+		}
+
 		classified <- classifiedKey{
 			path,
-			endpointClusterMap[source],
-			cl.Name,
+			source,
+			target,
 		}
 	}
 }
