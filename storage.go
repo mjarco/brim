@@ -71,10 +71,12 @@ func (s *dbStorage) store(task classifiedKey) error {
 	if err != nil {
 		return err
 	}
-	_, err = db.Query(q)
 	fmt.Printf("Query:\n%s\n", q)
+	rows, err := db.Query(q)
+
 	if err != nil {
 		return err
 	}
+	rows.Close()
 	return nil
 }

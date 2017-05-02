@@ -81,6 +81,7 @@ func classifier(
 	classified chan<-classifiedKey,
 	source string,
 	endpointClusterMap map[string]string) {
+
 	for _, key := range listResp.Contents {
 		path := listResp.Name + "/" + key.Key
 		cl, err := ring.Pick(path)
@@ -88,18 +89,19 @@ func classifier(
 			fmt.Println(err.Error())
 		}
 		dest := cl.Name
-		target := endpointClusterMap[source]
+		src := endpointClusterMap[source]
 
-		if source == target {
+		if src == dest {
 			continue
 		}
 
 		classified <- classifiedKey{
 			path,
-			source,
-			target,
+			src,
+			dest,
 		}
 	}
+
 }
 
 func mkRing() (sharding.ShardsRing, error) {
