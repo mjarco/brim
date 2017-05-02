@@ -2,18 +2,20 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"io/ioutil"
-	"github.com/allegro/akubra/sharding"
 	"github.com/allegro/akubra/config"
 	"github.com/allegro/akubra/log"
+	"github.com/allegro/akubra/sharding"
+	"io/ioutil"
 	"net/http"
+	"os"
 
 	// shardingconfig "github.com/allegro/akubra/sharding/config"
+	"github.com/AdRoll/goamz/s3"
 	"github.com/alecthomas/kingpin"
 	yaml "gopkg.in/yaml.v2"
-	"github.com/AdRoll/goamz/s3"
-	)
+)
+
+const BUCKET_WORKERS_COUNT = 5
 
 var (
 	// filled by linker
@@ -33,28 +35,28 @@ var (
 )
 
 type classifiedKey struct {
-	path, sourceCluster, targetCluster string
+	path, sourceRegion, targetRegion string
 }
 
 type BrimConf struct {
-	Database DBConfig
-	Admins map[string][]AdminConf
-	urlToCluster map[string]string
+	Database    DBConfig
+	Admins      map[string][]AdminConf
+	urlToRegion map[string]string
 }
 
-func (bc *BrimConf) endpointClusterMap () map[string]string {
-	if bc.urlToCluster == nil {
-		bc.urlToCluster = make(map[string]string)
-		for key, endpoints := range(bc.Admins) {
-			for _, adminConf := range(endpoints) {
-				bc.urlToCluster[adminConf.Endpoint] = key
+func (bc *BrimConf) endpointRegionMapping() map[string]string {
+	if bc.urlToRegion == nil {
+		bc.urlToRegion = make(map[string]string)
+		for key, endpoints := range bc.Admins {
+			for _, adminConf := range endpoints {
+				bc.urlToRegion[adminConf.Endpoint] = key
 			}
 		}
 	}
-	return bc.urlToCluster
+	return bc.urlToRegion
 }
 
-func configure () (BrimConf, error) {
+func configure() (BrimConf, error) {
 	bc := BrimConf{}
 	confFile, err := os.Open(*brimConf)
 	if err != nil {
@@ -78,18 +80,19 @@ func configure () (BrimConf, error) {
 func classifier(
 	ring sharding.ShardsRing,
 	listResp *s3.ListResp,
-	classified chan<-classifiedKey,
+	classified chan<- classifiedKey,
 	source string,
-	endpointClusterMap map[string]string) {
+	endpointRegionMap map[string]string) {
 
+	// keys listing from cluster bucket
 	for _, key := range listResp.Contents {
 		path := listResp.Name + "/" + key.Key
-		cl, err := ring.Pick(path)
+		region, err := ring.Pick(path)
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-		dest := cl.Name
-		src := endpointClusterMap[source]
+		dest := region.Name
+		src := endpointRegionMap[source]
 
 		if src == dest {
 			continue
@@ -101,7 +104,6 @@ func classifier(
 			dest,
 		}
 	}
-
 }
 
 func mkRing() (sharding.ShardsRing, error) {
@@ -121,27 +123,41 @@ func processCluster(
 	endpointClusterMap map[string]string) {
 
 	source := ac.Endpoint
-	bucketsCreds, err := listBucketsWithAuth(ac)
+	bucketsCredsList, err := listBucketsWithAuth(ac)
 	if err != nil {
 		log.Fatalf("Problems with fetching buckets list with keys", err.Error())
 	}
 
-	for _, bc := range bucketsCreds {
-		bucketListing := processBucket(bc.endpoint, bc.bucketName,
-			bc.accessKey, bc.secretKey)
-		if bucketListing == nil {
-			continue // ?
-		}
-		for listResp := range bucketListing {
-			cks := make (chan classifiedKey)
-			go func(){
-				for classifiedKey := range cks {
-					storage.store(classifiedKey)
+	buckets := make(chan bucketCreds)
+
+	for workerNo := 1; workerNo <= BUCKET_WORKERS_COUNT; workerNo++ {
+		go func(workerNo int, buckets <-chan bucketCreds) {
+			for bc := range buckets {
+				bucketListing := processBucket(bc.endpoint, bc.bucketName,
+					bc.accessKey, bc.secretKey)
+				if bucketListing == nil {
+					continue // ?
 				}
-			}()
-			classifier(ring, listResp, cks, source, endpointClusterMap)
-			close(cks)
-		}
+				for listResp := range bucketListing {
+					cks := make(chan classifiedKey)
+					go func() {
+						counter := 0
+						for classifiedKey := range cks {
+							counter++
+							storage.store(classifiedKey)
+						}
+						log.Printf("STATS WORKER: [%d] procced %d items from bucket '%s'.\n",
+							workerNo, counter, bc.bucketName)
+					}()
+					classifier(ring, listResp, cks, source, endpointClusterMap)
+					close(cks)
+				}
+			}
+		}(workerNo, buckets)
+	}
+
+	for _, bc := range bucketsCredsList {
+		buckets <- bc
 	}
 }
 
@@ -161,5 +177,5 @@ func main() {
 	storage := &dbStorage{
 		config: bc.Database,
 	}
-	processCluster(bc.Admins["prod"][0], storage, ring, bc.endpointClusterMap())
+	processCluster(bc.Admins["prod"][0], storage, ring, bc.endpointRegionMapping())
 }

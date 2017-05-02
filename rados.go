@@ -2,6 +2,7 @@ package main
 
 import (
 	radosAPI "github.com/mjarco/go-radosgw/pkg/api"
+	"log"
 )
 
 type bucketCreds struct {
@@ -17,24 +18,23 @@ func listBucketsWithAuth(ac AdminConf) ([]bucketCreds, error) {
 	if err != nil {
 		return nil, err
 	}
-	allUsers, err :=  api.GetUsers()
+	allUsers, err := api.GetUsers()
 	if err != nil {
 		return nil, err
 	}
-	tasks := []bucketCreds{}
+	bucketCredsList := []bucketCreds{}
 	for _, userName := range allUsers {
 		utasks, err := processUser(api, userName, ac.Endpoint)
 		if err != nil {
-			return tasks, err
+			return bucketCredsList, err
 		}
-		tasks = append(tasks, utasks...)
+		bucketCredsList = append(bucketCredsList, utasks...)
 	}
-	return tasks, nil
+	return bucketCredsList, nil
 }
 
-
 func processUser(api *radosAPI.API, userName, endpoint string) ([]bucketCreds, error) {
-	println("Processing user ", userName)
+	log.Println("Processing user ", userName)
 	user, err := api.GetUser(userName)
 	if err != nil {
 		return nil, err
@@ -52,9 +52,9 @@ func processUser(api *radosAPI.API, userName, endpoint string) ([]bucketCreds, e
 		}
 		tasks = append(tasks, bucketCreds{
 			bucketName: bucket.Name,
-			accessKey: user.Keys[0].AccessKey,
-			secretKey: user.Keys[0].SecretKey,
-			endpoint: endpoint,
+			accessKey:  user.Keys[0].AccessKey,
+			secretKey:  user.Keys[0].SecretKey,
+			endpoint:   endpoint,
 		})
 	}
 	return tasks, nil
