@@ -146,7 +146,7 @@ func processCluster(
 							counter++
 							storage.store(classifiedKey)
 						}
-						log.Printf("STATS WORKER: [%d] procced %d items from bucket '%s'.\n",
+						log.Printf("STATS CLASSIFIER WORKER: [%d] procced %d items from bucket '%s'.\n",
 							workerNo, counter, bc.bucketName)
 					}()
 					classifier(ring, listResp, cks, source, endpointClusterMap)
