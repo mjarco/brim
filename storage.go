@@ -2,10 +2,11 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"database/sql"
+	"fmt"
 	"text/template"
 
+	"github.com/allegro/akubra/log"
 	_ "github.com/lib/pq"
 )
 
@@ -23,8 +24,8 @@ type DBConfig struct {
 
 type dbStorage struct {
 	config DBConfig
-	db *sql.DB
-	tmpl *template.Template
+	db     *sql.DB
+	tmpl   *template.Template
 }
 
 func (s *dbStorage) conn() (db *sql.DB, err error) {
@@ -40,14 +41,14 @@ func (s *dbStorage) conn() (db *sql.DB, err error) {
 	return s.db, err
 }
 
-func (s *dbStorage) renderQuery (classKey classifiedKey) (string, error) {
+func (s *dbStorage) renderQuery(classKey classifiedKey) (string, error) {
 	var err error
 
 	task := MigrationTask{
-		Key: classKey.path,
-		Env: "none",
-		To: classKey.targetCluster,
-		From: classKey.sourceCluster,
+		Key:  classKey.path,
+		Env:  "none",
+		To:   classKey.targetRegion,
+		From: classKey.sourceRegion,
 	}
 
 	if s.tmpl == nil {
@@ -71,7 +72,7 @@ func (s *dbStorage) store(task classifiedKey) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Query:\n%s\n", q)
+	log.Debug("Query:\n%s\n", q)
 	rows, err := db.Query(q)
 
 	if err != nil {
