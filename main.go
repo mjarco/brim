@@ -44,7 +44,7 @@ type BrimConf struct {
 	urlToRegion map[string]string
 }
 
-func (bc *BrimConf) endpointRegionMapping() map[string]string {
+func (bc *BrimConf) EndpointRegionMapping() map[string]string {
 	if bc.urlToRegion == nil {
 		bc.urlToRegion = make(map[string]string)
 		for key, endpoints := range bc.Admins {
@@ -162,7 +162,7 @@ func processCluster(
 }
 
 func main() {
-	versionString := fmt.Sprintf("Akubra (%s version)", version)
+	versionString := fmt.Sprintf("Brim (%s version)", version)
 	kingpin.Version(versionString)
 	kingpin.Parse()
 	ring, err := mkRing()
@@ -177,5 +177,5 @@ func main() {
 	storage := &dbStorage{
 		config: bc.Database,
 	}
-	processCluster(bc.Admins["prod"][0], storage, ring, bc.endpointRegionMapping())
+	processCluster(bc.Admins["prod"][0], storage, ring, bc.EndpointRegionMapping())
 }
