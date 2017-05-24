@@ -33,7 +33,7 @@ func prepareS3Clients(srcS3Auth s3MigrationAuth, dstS3Auth s3MigrationAuth) (*s3
 	return getS3Client(srcS3Auth), getS3Client(dstS3Auth)
 }
 
-func CopyS3Object(migrationObj s3MigrationObj, srcS3Client s3.S3, dstS3Client s3.S3) (bool, error) {
+func CopyS3Object(migrationObj s3MigrationObj, srcS3Client, dstS3Client s3.S3) (bool, error) {
 	log.Debug("CopyS3Object START")
 
 	log.Debug("migrationObj.bucket: %v", migrationObj.bucket)

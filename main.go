@@ -38,14 +38,16 @@ type classifiedKey struct {
 	path, sourceRegion, targetRegion string
 }
 
+type AdminsConf map[string][]AdminConf
+
 type BrimConf struct {
-	Database    DBConfig
-	Admins      map[string][]AdminConf
+	Database    DBConfig		`yaml:"database"`
+	Admins      AdminsConf		`yaml:"admins" validate:"AdminConfValidator=Admins"`
 	urlToRegion map[string]string
 }
 
 func (bc *BrimConf) EndpointRegionMapping() map[string]string {
-	if bc.urlToRegion == nil {
+	if bc.urlToRegion == nil && bc.Admins != nil {
 		bc.urlToRegion = make(map[string]string)
 		for key, endpoints := range bc.Admins {
 			for _, adminConf := range endpoints {
@@ -73,7 +75,8 @@ func configure() (BrimConf, error) {
 	if err != nil {
 		return bc, err
 	}
-	fmt.Printf("%v\n", bc)
+	fmt.Printf("BrimConf Unmarshal: %v\n", bc)
+
 	return bc, err
 }
 
@@ -172,6 +175,10 @@ func main() {
 	bc, err := configure()
 	if err != nil {
 		log.Fatalf("Cannot read brim config %s", err.Error())
+	}
+
+	if !ValidateBrimConfig(bc) {
+		log.Fatalln("BRIM YAML validation error - exit!")
 	}
 
 	storage := &dbStorage{

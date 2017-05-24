@@ -12,14 +12,16 @@ import (
 
 type MigrationTask struct {
 	From, To, Key, Env string
+
 }
 
 type DBConfig struct {
-	User       string `yaml:"user"`
-	Password   string `yaml:"password"`
-	DBName     string `yaml:"dbname"`
-	Host       string `yaml:"host"`
-	InsertTmpl string `yaml:"inserttmpl"`
+	User       string `yaml:"user" validate:"nonzero"`
+	Password   string `yaml:"password" validate:"min=0,max=32"`
+	DBName     string `yaml:"dbname" validate:"min=4,max=12"`
+	Host       string `yaml:"host" validate:"min=4,max=48"`
+	InsertTmpl string `yaml:"inserttmpl" validate:"min=10"`
+	SelectTmpl string `yaml:"selecttmpl" validate:"min=10"`
 }
 
 type dbStorage struct {
